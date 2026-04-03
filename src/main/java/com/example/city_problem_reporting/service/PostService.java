@@ -1,0 +1,115 @@
+package com.example.city_problem_reporting.service;
+
+import com.example.city_problem_reporting.dto.CreatePostRequest;
+import com.example.city_problem_reporting.dto.PostResponse;
+import com.example.city_problem_reporting.model.Post;
+import com.example.city_problem_reporting.model.User;
+import com.example.city_problem_reporting.repository.PostRepository;
+import com.example.city_problem_reporting.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Service
+public class PostService {
+    private static final String NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+
+    private final PostRepository postRepository;
+    private final UserRepository userRepository;
+    private final RestClient restClient;
+
+    public PostService(PostRepository postRepository, UserRepository userRepository) {
+        this.postRepository = postRepository;
+        this.userRepository = userRepository;
+        this.restClient = RestClient.builder()
+                .defaultHeader("User-Agent", "city-problem-reporting-app")
+                .build();
+    }
+
+    public PostResponse createPost(CreatePostRequest request, String authenticatedUsername) {
+        if (request.getDescription() == null || request.getDescription().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "description is required");
+        }
+
+        User user = userRepository.findByUsername(authenticatedUsername)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                        "Authenticated user was not found in database"));
+
+        Coordinates coordinates = resolveCoordinates(request);
+
+        Post post = new Post();
+        post.setUser(user);
+        post.setDescription(request.getDescription());
+        post.setImageUrl(request.getImageUrl());
+        post.setLatitude(coordinates.latitude());
+        post.setLongitude(coordinates.longitude());
+        post.setCategory(request.getCategory());
+        post.setPriorityScore(0);
+        post.setStatus("OPEN");
+        post.setCreatedAt(LocalDateTime.now());
+
+        Post savedPost = postRepository.save(post);
+
+        PostResponse response = new PostResponse();
+        response.setId(savedPost.getId());
+        response.setUserId(savedPost.getUser().getId());
+        response.setDescription(savedPost.getDescription());
+        response.setImageUrl(savedPost.getImageUrl());
+        response.setLatitude(savedPost.getLatitude());
+        response.setLongitude(savedPost.getLongitude());
+        response.setCategory(savedPost.getCategory());
+        response.setPriorityScore(savedPost.getPriorityScore());
+        response.setStatus(savedPost.getStatus());
+        response.setCreatedAt(savedPost.getCreatedAt());
+
+        return response;
+    }
+
+    private Coordinates resolveCoordinates(CreatePostRequest request) {
+        if (request.getLatitude() != null && request.getLongitude() != null) {
+            return new Coordinates(request.getLatitude(), request.getLongitude());
+        }
+
+        if (request.getLocationAddress() == null || request.getLocationAddress().isBlank()) {
+            return new Coordinates(null, null);
+        }
+
+        String url = UriComponentsBuilder
+                .fromUriString(NOMINATIM_URL)
+                .queryParam("q", request.getLocationAddress())
+                .queryParam("format", "json")
+                .queryParam("limit", 1)
+                .queryParam("addressdetails", 0)
+                .build()
+                .toUriString();
+
+        JsonNode response = restClient.get()
+                .uri(url)
+                .retrieve()
+                .body(JsonNode.class);
+
+        if (response == null || !response.isArray() || response.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Could not resolve locationAddress. Try a more specific address");
+        }
+
+        JsonNode first = response.get(0);
+        try {
+            BigDecimal latitude = new BigDecimal(first.get("lat").asText());
+            BigDecimal longitude = new BigDecimal(first.get("lon").asText());
+            return new Coordinates(latitude, longitude);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Geocoding service returned invalid coordinates", ex);
+        }
+    }
+
+    private record Coordinates(BigDecimal latitude, BigDecimal longitude) {
+    }
+}

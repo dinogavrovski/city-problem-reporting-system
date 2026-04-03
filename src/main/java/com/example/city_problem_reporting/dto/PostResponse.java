@@ -1,42 +1,19 @@
-package com.example.city_problem_reporting.model;
+package com.example.city_problem_reporting.dto;
 
-import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Entity
-@Table(name = "posts")
-public class Post {
-    @Id
-    @GeneratedValue
+public class PostResponse {
     private UUID id;
-
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
+    private UUID userId;
     private String description;
-
-    @Column(name = "image_url")
     private String imageUrl;
-
-    @Column(precision = 9, scale = 6)
     private BigDecimal latitude;
-
-    @Column(precision = 9, scale = 6)
     private BigDecimal longitude;
-
-    @Column(length = 100)
     private String category;
-
-    @Column(name = "priority_score")
     private Integer priorityScore;
-
-    @Column(length = 50)
     private String status;
-
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     public UUID getId() {
@@ -47,12 +24,12 @@ public class Post {
         this.id = id;
     }
 
-    public User getUser() {
-        return user;
+    public UUID getUserId() {
+        return userId;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setUserId(UUID userId) {
+        this.userId = userId;
     }
 
     public String getDescription() {
@@ -118,5 +95,4 @@ public class Post {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
-
 }
