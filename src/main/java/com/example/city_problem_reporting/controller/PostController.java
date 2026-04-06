@@ -11,12 +11,12 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import com.example.city_problem_reporting.service.PostService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.security.Principal;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -27,7 +27,14 @@ public class PostController {
         this.postService = postService;
     }
 
-    @PostMapping
+
+    @GetMapping
+    @Operation(summary = "Get all posts", security = @SecurityRequirement(name = "basicAuth"))
+    public ResponseEntity<List<PostResponse>> getAllPosts() {
+        return ResponseEntity.ok(postService.getAllPosts());
+    }
+
+    @PostMapping("/create")
     @Operation(summary = "Create post", security = @SecurityRequirement(name = "basicAuth"))
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Post created",
@@ -39,4 +46,15 @@ public class PostController {
         PostResponse createdPost = postService.createPost(request, principal.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(createdPost);
     }
+
+    @GetMapping("/geocode/reverse")
+    public ResponseEntity<Map<String, String>> reverseGeocode(
+            @RequestParam BigDecimal lat,
+            @RequestParam BigDecimal lng) {
+
+        String address = postService.reverseGeocode(lat, lng);
+        return ResponseEntity.ok(Map.of("address", address));
+    }
+
+
 }
