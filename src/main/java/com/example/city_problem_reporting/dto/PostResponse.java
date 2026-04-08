@@ -1,5 +1,7 @@
 package com.example.city_problem_reporting.dto;
 
+import com.example.city_problem_reporting.model.Post;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -94,5 +96,20 @@ public class PostResponse {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public static PostResponse fromPost(Post post) {
+        PostResponse response = new PostResponse();
+        response.setId(post.getId());
+        response.setUserId(post.getUser().getId());
+        response.setDescription(post.getDescription());
+        response.setImageUrl(post.getImageUrl());
+        response.setLatitude(post.getLatitude());
+        response.setLongitude(post.getLongitude());
+        response.setCategory(post.getCategory());
+        response.setPriorityScore(post.getPriorityScore());
+        response.setStatus(post.getStatus());
+        response.setCreatedAt(post.getCreatedAt());
+        return response;
     }
 }

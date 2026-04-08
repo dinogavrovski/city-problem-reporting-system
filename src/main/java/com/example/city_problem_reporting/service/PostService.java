@@ -7,6 +7,7 @@ import com.example.city_problem_reporting.model.User;
 import com.example.city_problem_reporting.repository.PostRepository;
 import com.example.city_problem_reporting.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -15,10 +16,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class PostService {
     private static final String NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+    private static final String NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
@@ -56,19 +59,7 @@ public class PostService {
 
         Post savedPost = postRepository.save(post);
 
-        PostResponse response = new PostResponse();
-        response.setId(savedPost.getId());
-        response.setUserId(savedPost.getUser().getId());
-        response.setDescription(savedPost.getDescription());
-        response.setImageUrl(savedPost.getImageUrl());
-        response.setLatitude(savedPost.getLatitude());
-        response.setLongitude(savedPost.getLongitude());
-        response.setCategory(savedPost.getCategory());
-        response.setPriorityScore(savedPost.getPriorityScore());
-        response.setStatus(savedPost.getStatus());
-        response.setCreatedAt(savedPost.getCreatedAt());
-
-        return response;
+        return PostResponse.fromPost(savedPost);
     }
 
     private Coordinates resolveCoordinates(CreatePostRequest request) {
@@ -112,4 +103,41 @@ public class PostService {
 
     private record Coordinates(BigDecimal latitude, BigDecimal longitude) {
     }
+
+    public String reverseGeocode(BigDecimal latitude, BigDecimal longitude) {
+        String url = UriComponentsBuilder
+                .fromUriString(NOMINATIM_REVERSE_URL)
+                .queryParam("lat", latitude)
+                .queryParam("lon", longitude)
+                .queryParam("format", "json")
+                .build()
+                .toUriString();
+
+        String rawResponse = restClient.get()
+                .uri(url)
+                .retrieve()
+                .body(String.class);  // fetch as String
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(rawResponse);  // parse manually
+
+            if (root == null || root.get("display_name") == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "Could not resolve coordinates to an address");
+            }
+
+            return root.get("display_name").asText();
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Failed to parse geocoding response", ex);
+        }
+    }
+
+    public List<PostResponse> getAllPosts() {
+        return postRepository.findAll().stream()
+                .map(PostResponse::fromPost)
+                .toList();
+    }
+
 }
