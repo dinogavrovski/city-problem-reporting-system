@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -54,6 +55,12 @@ public class PostController {
 
         String address = postService.reverseGeocode(lat, lng);
         return ResponseEntity.ok(Map.of("address", address));
+    }
+
+    @GetMapping("/user/{userId}")
+    @Operation(summary = "Get all posts by user", security = @SecurityRequirement(name = "basicAuth"))
+    public ResponseEntity<List<PostResponse>> getPostsByUserId(@PathVariable UUID userId) {
+        return ResponseEntity.ok(postService.getPostsByUserId(userId));
     }
 
 

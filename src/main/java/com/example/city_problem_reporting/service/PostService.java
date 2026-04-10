@@ -17,6 +17,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class PostService {
@@ -139,5 +140,12 @@ public class PostService {
                 .map(PostResponse::fromPost)
                 .toList();
     }
+
+    public List<PostResponse> getPostsByUserId(UUID userId) {
+        return postRepository.findByUser_Id(userId).stream()
+                .map(PostResponse::fromPost)
+                .toList();
+    }
+
 
 }
