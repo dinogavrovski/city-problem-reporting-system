@@ -63,5 +63,24 @@ public class PostController {
         return ResponseEntity.ok(postService.getPostsByUserId(userId));
     }
 
+    @PutMapping("/{postId}/status")
+    @Operation(summary = "Update report status", security = @SecurityRequirement(name = "basicAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Status updated",
+                    content = @Content(schema = @Schema(implementation = PostResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Post not found"),
+            @ApiResponse(responseCode = "400", description = "Invalid status value"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    public ResponseEntity<PostResponse> updateReportStatus(
+            @PathVariable UUID postId,
+            @RequestParam String status,
+            Principal principal) {
+
+        PostResponse updatedPost = postService.updateReportStatus(postId, status, principal.getName());
+        return ResponseEntity.ok(updatedPost);
+    }
+
+
 
 }

@@ -147,5 +147,23 @@ public class PostService {
                 .toList();
     }
 
+    public PostResponse updateReportStatus(UUID postId, String status, String username) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        if (status == null || status.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status cannot be empty");
+        }
+
+        post.setStatus(status);
+        Post updatedPost = postRepository.save(post);
+
+        return PostResponse.fromPost(updatedPost);
+    }
+
+
 
 }
