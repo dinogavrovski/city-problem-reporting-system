@@ -1,5 +1,6 @@
 package com.example.city_problem_reporting.service;
 
+import com.example.city_problem_reporting.dto.ClassificationResult;
 import com.example.city_problem_reporting.dto.CreatePostRequest;
 import com.example.city_problem_reporting.dto.PostResponse;
 import com.example.city_problem_reporting.model.Post;
@@ -27,10 +28,13 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final RestClient restClient;
+    private final ClassificationService classificationService;
 
-    public PostService(PostRepository postRepository, UserRepository userRepository) {
+    public PostService(PostRepository postRepository, UserRepository userRepository,
+                       ClassificationService classificationService) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
+        this.classificationService = classificationService;
         this.restClient = RestClient.builder()
                 .defaultHeader("User-Agent", "city-problem-reporting-app")
                 .build();
@@ -53,10 +57,17 @@ public class PostService {
         post.setImageUrl(request.getImageUrl());
         post.setLatitude(coordinates.latitude());
         post.setLongitude(coordinates.longitude());
-        post.setCategory(request.getCategory());
         post.setPriorityScore(0);
         post.setStatus("OPEN");
         post.setCreatedAt(LocalDateTime.now());
+
+        // Auto-classify from image, fallback to manual category
+        if (request.getImageUrl() != null && !request.getImageUrl().isBlank()) {
+            ClassificationResult result = classificationService.classifyFromUrl(request.getImageUrl());
+            post.setCategory(result.getCategory());
+        } else {
+            post.setCategory(request.getCategory());
+        }
 
         Post savedPost = postRepository.save(post);
 
@@ -117,11 +128,11 @@ public class PostService {
         String rawResponse = restClient.get()
                 .uri(url)
                 .retrieve()
-                .body(String.class);  // fetch as String
+                .body(String.class);
 
         try {
             ObjectMapper mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(rawResponse);  // parse manually
+            JsonNode root = mapper.readTree(rawResponse);
 
             if (root == null || root.get("display_name") == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
@@ -163,7 +174,4 @@ public class PostService {
 
         return PostResponse.fromPost(updatedPost);
     }
-
-
-
 }
