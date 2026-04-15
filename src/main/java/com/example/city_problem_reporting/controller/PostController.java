@@ -82,5 +82,23 @@ public class PostController {
     }
 
 
+    @PutMapping("/{postId}/priority")
+    @Operation(summary = "Update report priority", security = @SecurityRequirement(name = "basicAuth"))
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Priority updated",
+                    content = @Content(schema = @Schema(implementation = PostResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Post not found"),
+            @ApiResponse(responseCode = "400", description = "Invalid priority value"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    public ResponseEntity<PostResponse> updateReportPriority(
+            @PathVariable UUID postId,
+            @RequestParam int priority,
+            Principal principal) {
+
+        PostResponse updatedPost = postService.updateReportPriority(postId, priority, principal.getName());
+        return ResponseEntity.ok(updatedPost);
+    }
+
 
 }
