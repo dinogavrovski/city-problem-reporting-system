@@ -1,6 +1,7 @@
 package com.example.city_problem_reporting.service;
 
 import com.example.city_problem_reporting.dto.CreateUserRequest;
+import com.example.city_problem_reporting.dto.UpdateUserRequest;
 import com.example.city_problem_reporting.dto.UserResponse;
 import com.example.city_problem_reporting.model.User;
 import com.example.city_problem_reporting.repository.UserRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 public class UserService {
@@ -58,6 +60,46 @@ public class UserService {
         response.setAvatarUrl(savedUser.getAvatarUrl());
         response.setCreatedAt(savedUser.getCreatedAt());
 
+        return response;
+    }
+    public UserResponse getUserByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        return toResponse(user);
+    }
+
+    public UserResponse getUserById(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        return toResponse(user);
+    }
+
+    public UserResponse updateUser(String username, UpdateUserRequest request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            if (!request.getUsername().equals(user.getUsername()) &&
+                    userRepository.existsByUsername(request.getUsername())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already taken");
+            }
+            user.setUsername(request.getUsername());
+        }
+
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
+
+        return toResponse(userRepository.save(user));
+    }
+
+    private UserResponse toResponse(User user) {
+        UserResponse response = new UserResponse();
+        response.setId(user.getId());
+        response.setEmail(user.getEmail());
+        response.setUsername(user.getUsername());
+        response.setAvatarUrl(user.getAvatarUrl());
+        response.setCreatedAt(user.getCreatedAt());
         return response;
     }
 }

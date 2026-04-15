@@ -22,4 +22,16 @@ public class Like {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public Post getPost() { return post; }
+    public void setPost(Post post) { this.post = post; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
 }
