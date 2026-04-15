@@ -61,7 +61,6 @@ public class PostService {
         post.setStatus("OPEN");
         post.setCreatedAt(LocalDateTime.now());
 
-        // Auto-classify from image, fallback to manual category
         if (request.getImageUrl() != null && !request.getImageUrl().isBlank()) {
             ClassificationResult result = classificationService.classifyFromUrl(request.getImageUrl());
             post.setCategory(result.getCategory());
