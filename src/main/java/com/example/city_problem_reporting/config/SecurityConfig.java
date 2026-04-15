@@ -24,9 +24,19 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**","/api/posts/geocode/reverse", "/api/users").permitAll()
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/api/posts/geocode/reverse",
+                                "/api/users",
+                                "/api/auth/**",
+                                "/uploads/**",
+                                "/api/upload"
+                        ).permitAll()
                         .requestMatchers("/api/posts/**").authenticated()
-                        .anyRequest().permitAll())
+                        .requestMatchers("/api/users/**").authenticated()
+                        .anyRequest().permitAll()
+                )
                 .httpBasic(httpBasic -> httpBasic.authenticationEntryPoint(noPopupAuthEntryPoint()))
                 .formLogin(form -> form.disable());
 
@@ -86,11 +96,13 @@ public class SecurityConfig {
                     return false;
                 }
 
-                if (encodedPassword.startsWith("$2a$") || encodedPassword.startsWith("$2b$") || encodedPassword.startsWith("$2y$")) {
+                if (encodedPassword.startsWith("$2a$") ||
+                        encodedPassword.startsWith("$2b$") ||
+                        encodedPassword.startsWith("$2y$")) {
                     return bcrypt.matches(rawPassword, encodedPassword);
                 }
 
-                // Backward compatibility for users created before BCrypt was introduced.
+                // Backward compatibility for users created before BCrypt was introduced
                 return rawPassword.toString().equals(encodedPassword);
             }
         };
