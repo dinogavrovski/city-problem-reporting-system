@@ -174,4 +174,22 @@ public class PostService {
 
         return PostResponse.fromPost(updatedPost);
     }
+
+    public PostResponse updateReportPriority(UUID postId, int priority, String username) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        if (priority < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Priority must be non-negative");
+        }
+
+        post.setPriorityScore(priority);
+        Post updatedPost = postRepository.save(post);
+
+        return PostResponse.fromPost(updatedPost);
+    }
+
 }
