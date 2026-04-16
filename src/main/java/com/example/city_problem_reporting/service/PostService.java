@@ -19,6 +19,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import java.time.LocalDateTime;
 
 @Service
 public class PostService {
@@ -38,6 +42,24 @@ public class PostService {
         this.restClient = RestClient.builder()
                 .defaultHeader("User-Agent", "city-problem-reporting-app")
                 .build();
+    }
+
+
+
+
+    public Page<PostResponse> getPosts(int page, int size,
+                                       String category,
+                                       String status,
+                                       String startDate,
+                                       String endDate) {
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        LocalDateTime start = startDate != null ? LocalDateTime.parse(startDate) : null;
+        LocalDateTime end = endDate != null ? LocalDateTime.parse(endDate) : null;
+
+        return postRepository.findWithFilters(category, status, start, end, pageable)
+                .map(PostResponse::fromPost);
     }
 
     public PostResponse createPost(CreatePostRequest request, String authenticatedUsername) {
