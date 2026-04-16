@@ -28,6 +28,21 @@ public class PostController {
         this.postService = postService;
     }
 
+    @GetMapping
+    @Operation(summary = "Get posts with pagination and filters", security = @SecurityRequirement(name = "basicAuth"))
+    public ResponseEntity<?> getPosts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate
+    ) {
+        return ResponseEntity.ok(
+                postService.getPosts(page, size, category, status, startDate, endDate)
+        );
+    }
+
 
     @GetMapping
     @Operation(summary = "Get all posts", security = @SecurityRequirement(name = "basicAuth"))
