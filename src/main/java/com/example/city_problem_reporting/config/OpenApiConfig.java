@@ -6,13 +6,18 @@ import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.context.annotation.Configuration;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 @Configuration
-@OpenAPIDefinition(info = @Info(title = "City Problem Reporting API", version = "v1"))
+@OpenAPIDefinition(
+        info = @Info(title = "City Problem Reporting API", version = "v1"),
+        security = @SecurityRequirement(name = "bearerAuth")
+)
 @SecurityScheme(
-        name = "basicAuth",
+        name = "bearerAuth",
         type = SecuritySchemeType.HTTP,
-        scheme = "basic",
+        scheme = "bearer",
+        bearerFormat = "JWT",
         in = SecuritySchemeIn.HEADER
 )
 public class OpenApiConfig {

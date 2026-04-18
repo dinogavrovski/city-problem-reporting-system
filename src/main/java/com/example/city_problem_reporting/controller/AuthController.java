@@ -3,6 +3,7 @@ package com.example.city_problem_reporting.controller;
 import com.example.city_problem_reporting.dto.LoginResponse;
 import com.example.city_problem_reporting.model.User;
 import com.example.city_problem_reporting.repository.UserRepository;
+import com.example.city_problem_reporting.security.JwtUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -16,11 +17,14 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
 
     public AuthController(AuthenticationManager authenticationManager,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          JwtUtil jwtUtil) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/login")
@@ -35,11 +39,14 @@ public class AuthController {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        String token = jwtUtil.generateToken(user.getUsername());
+
         return ResponseEntity.ok(new LoginResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
-                user.getAvatarUrl()
+                user.getAvatarUrl(),
+                token
         ));
     }
 }
