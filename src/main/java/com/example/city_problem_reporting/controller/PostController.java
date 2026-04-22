@@ -31,8 +31,10 @@ public class PostController {
 
     @GetMapping
     @Operation(summary = "Get all posts", security = @SecurityRequirement(name = "basicAuth"))
-    public ResponseEntity<List<PostResponse>> getAllPosts() {
-        return ResponseEntity.ok(postService.getAllPosts());
+    public ResponseEntity<Map<String, Object>> getAllPosts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(postService.getAllPostsPaged(page, size));
     }
 
     @PostMapping("/create")
@@ -99,6 +101,19 @@ public class PostController {
         PostResponse updatedPost = postService.updateReportPriority(postId, priority, principal.getName());
         return ResponseEntity.ok(updatedPost);
     }
+    @DeleteMapping("/{postId}")
+    @Operation(summary = "Delete post", security = @SecurityRequirement(name = "basicAuth"))
+    public ResponseEntity<Void> deletePost(@PathVariable UUID postId, Principal principal) {
+        postService.deletePost(postId, principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{postId}")
+    public ResponseEntity<PostResponse> updatePost(@PathVariable UUID postId,
+                                                   @RequestBody Map<String, String> request, Principal principal) {
+        return ResponseEntity.ok(postService.updatePost(postId, request, principal.getName()));
+    }
+
 
 
 }
