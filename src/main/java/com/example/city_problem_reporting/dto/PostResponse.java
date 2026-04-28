@@ -75,16 +75,29 @@ public class PostResponse {
         response.setId(post.getId());
         response.setUserId(post.getUser().getId());
         response.setUsername(post.getUser().getUsername());
-        response.setAvatarUrl(post.getUser().getAvatarUrl());
+
+        // Sanitize avatarUrl — never send empty string
+        String avatarUrl = post.getUser().getAvatarUrl();
+        response.setAvatarUrl(avatarUrl != null && !avatarUrl.isBlank() ? avatarUrl : null);
+
         response.setDescription(post.getDescription());
-        response.setImageUrl(post.getImageUrl());
+
+        // Sanitize imageUrl — never send empty string
+        String imageUrl = post.getImageUrl();
+        response.setImageUrl(imageUrl != null && !imageUrl.isBlank() ? imageUrl : null);
+
         response.setLatitude(post.getLatitude());
         response.setLongitude(post.getLongitude());
         response.setCategory(post.getCategory());
         response.setPriorityScore(post.getPriorityScore());
         response.setStatus(post.getStatus());
         response.setCreatedAt(post.getCreatedAt());
-        // likeCount, commentCount, likedByMe set separately by service
+
+        // Default to 0 — service sets real values after calling repositories
+        response.setLikeCount(0);
+        response.setCommentCount(0);
+        response.setLikedByMe(false);
+
         return response;
     }
 }

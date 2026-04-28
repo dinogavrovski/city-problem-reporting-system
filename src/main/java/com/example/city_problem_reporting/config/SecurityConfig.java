@@ -35,6 +35,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/posts/**").authenticated()
                         .requestMatchers("/api/users/**").authenticated()
+                        .requestMatchers("/api/export/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .httpBasic(httpBasic -> httpBasic.authenticationEntryPoint(noPopupAuthEntryPoint()))

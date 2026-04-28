@@ -5,10 +5,16 @@ import com.example.city_problem_reporting.dto.CreatePostRequest;
 import com.example.city_problem_reporting.dto.PostResponse;
 import com.example.city_problem_reporting.model.Post;
 import com.example.city_problem_reporting.model.User;
+import com.example.city_problem_reporting.repository.CommentRepository;
+import com.example.city_problem_reporting.repository.LikeRepository;
 import com.example.city_problem_reporting.repository.PostRepository;
 import com.example.city_problem_reporting.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -18,6 +24,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -29,49 +36,124 @@ public class PostService {
     private final UserRepository userRepository;
     private final RestClient restClient;
     private final ClassificationService classificationService;
+    private final LikeRepository likeRepository;
+    private final CommentRepository commentRepository;
 
     public PostService(PostRepository postRepository, UserRepository userRepository,
-                       ClassificationService classificationService) {
+                       ClassificationService classificationService,
+                       LikeRepository likeRepository,
+                       CommentRepository commentRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
         this.classificationService = classificationService;
+        this.likeRepository = likeRepository;
+        this.commentRepository = commentRepository;
         this.restClient = RestClient.builder()
                 .defaultHeader("User-Agent", "city-problem-reporting-app")
                 .build();
     }
 
-    public PostResponse createPost(CreatePostRequest request, String authenticatedUsername) {
-        if (request.getDescription() == null || request.getDescription().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "description is required");
+//    public PostResponse createPost(CreatePostRequest request, String authenticatedUsername) {
+//        if (request.getDescription() == null || request.getDescription().isBlank()) {
+//            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "description is required");
+//        }
+//
+//        User user = userRepository.findByUsername(authenticatedUsername)
+//                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+//                        "Authenticated user was not found in database"));
+//
+//        Coordinates coordinates = resolveCoordinates(request);
+//
+//        Post post = new Post();
+//        post.setUser(user);
+//        post.setDescription(request.getDescription());
+//        post.setImageUrl(request.getImageUrl());
+//        post.setLatitude(coordinates.latitude());
+//        post.setLongitude(coordinates.longitude());
+//        post.setPriorityScore(0);
+//        post.setStatus("OPEN");
+//        post.setCreatedAt(LocalDateTime.now());
+//
+//        // Auto-classify from image, fallback to manual category
+//        if (request.getImageUrl() != null && !request.getImageUrl().isBlank()) {
+//            ClassificationResult result = classificationService.classifyFromUrl(request.getImageUrl());
+//            post.setCategory(result.getCategory());
+//        } else {
+//            post.setCategory(request.getCategory() != null ? request.getCategory() : "other");
+//        }
+//
+//        Post savedPost = postRepository.save(post);
+//        return PostResponse.fromPost(savedPost);
+//        // likeCount and commentCount are 0 for a brand new post — no need to query
+//    }
+
+public PostResponse createPost(CreatePostRequest request, String authenticatedUsername) {
+    if (request.getDescription() == null || request.getDescription().isBlank()) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "description is required");
+    }
+
+    User user = userRepository.findByUsername(authenticatedUsername)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Authenticated user was not found in database"));
+
+    Coordinates coordinates = resolveCoordinates(request);
+
+    Post post = new Post();
+    post.setUser(user);
+    post.setDescription(request.getDescription());
+    post.setImageUrl(request.getImageUrl());
+    post.setLatitude(coordinates.latitude());
+    post.setLongitude(coordinates.longitude());
+    post.setPriorityScore(0);
+    post.setStatus("OPEN");
+    post.setCreatedAt(LocalDateTime.now());
+
+    // Auto-classify from image, fallback to manual category
+    if (request.getImageUrl() != null && !request.getImageUrl().isBlank()) {
+        ClassificationResult result = classificationService.classifyFromUrl(request.getImageUrl());
+        post.setCategory(result.getCategory());
+    } else {
+        post.setCategory(request.getCategory() != null ? request.getCategory() : "other");
+    }
+
+    Post savedPost = postRepository.save(post);
+
+    // Increment priority of nearby posts with the same category
+    if (coordinates.latitude() != null && coordinates.longitude() != null
+            && savedPost.getCategory() != null) {
+        incrementNearbyPriority(savedPost);
+    }
+
+    return PostResponse.fromPost(savedPost);
+}
+
+    private void incrementNearbyPriority(Post newPost) {
+        // Radius threshold — about 100 meters in degrees
+        double threshold = 0.001;
+
+        double newLat = newPost.getLatitude().doubleValue();
+        double newLng = newPost.getLongitude().doubleValue();
+
+        List<Post> nearbyPosts = postRepository.findAll().stream()
+                .filter(p -> !p.getId().equals(newPost.getId()))
+                .filter(p -> p.getLatitude() != null && p.getLongitude() != null)
+                .filter(p -> p.getCategory() != null
+                        && p.getCategory().equals(newPost.getCategory()))
+                .filter(p -> {
+                    double latDiff = Math.abs(p.getLatitude().doubleValue() - newLat);
+                    double lngDiff = Math.abs(p.getLongitude().doubleValue() - newLng);
+                    return latDiff < threshold && lngDiff < threshold;
+                })
+                .toList();
+
+        for (Post nearby : nearbyPosts) {
+            nearby.setPriorityScore(
+                    (nearby.getPriorityScore() == null ? 0 : nearby.getPriorityScore()) + 1
+            );
+            postRepository.save(nearby);
+            System.out.println("Priority bumped for post: " + nearby.getId()
+                    + " → " + nearby.getPriorityScore());
         }
-
-        User user = userRepository.findByUsername(authenticatedUsername)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
-                        "Authenticated user was not found in database"));
-
-        Coordinates coordinates = resolveCoordinates(request);
-
-        Post post = new Post();
-        post.setUser(user);
-        post.setDescription(request.getDescription());
-        post.setImageUrl(request.getImageUrl());
-        post.setLatitude(coordinates.latitude());
-        post.setLongitude(coordinates.longitude());
-        post.setPriorityScore(0);
-        post.setStatus("OPEN");
-        post.setCreatedAt(LocalDateTime.now());
-
-        // Auto-classify from image, fallback to manual category
-        if (request.getImageUrl() != null && !request.getImageUrl().isBlank()) {
-            ClassificationResult result = classificationService.classifyFromUrl(request.getImageUrl());
-            post.setCategory(result.getCategory());
-        } else {
-            post.setCategory(request.getCategory());
-        }
-
-        Post savedPost = postRepository.save(post);
-
-        return PostResponse.fromPost(savedPost);
     }
 
     private Coordinates resolveCoordinates(CreatePostRequest request) {
@@ -113,8 +195,7 @@ public class PostService {
         }
     }
 
-    private record Coordinates(BigDecimal latitude, BigDecimal longitude) {
-    }
+    private record Coordinates(BigDecimal latitude, BigDecimal longitude) {}
 
     public String reverseGeocode(BigDecimal latitude, BigDecimal longitude) {
         String url = UriComponentsBuilder
@@ -148,13 +229,23 @@ public class PostService {
 
     public List<PostResponse> getAllPosts() {
         return postRepository.findAll().stream()
-                .map(PostResponse::fromPost)
+                .map(post -> {
+                    PostResponse response = PostResponse.fromPost(post);
+                    response.setLikeCount(likeRepository.countByPost(post));
+                    response.setCommentCount(commentRepository.countByPost(post));
+                    return response;
+                })
                 .toList();
     }
 
     public List<PostResponse> getPostsByUserId(UUID userId) {
         return postRepository.findByUser_Id(userId).stream()
-                .map(PostResponse::fromPost)
+                .map(post -> {
+                    PostResponse response = PostResponse.fromPost(post);
+                    response.setLikeCount(likeRepository.countByPost(post));
+                    response.setCommentCount(commentRepository.countByPost(post));
+                    return response;
+                })
                 .toList();
     }
 
@@ -162,7 +253,7 @@ public class PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
 
-        User user = userRepository.findByUsername(username)
+        userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
 
         if (status == null || status.isBlank()) {
@@ -171,7 +262,6 @@ public class PostService {
 
         post.setStatus(status);
         Post updatedPost = postRepository.save(post);
-
         return PostResponse.fromPost(updatedPost);
     }
 
@@ -179,7 +269,7 @@ public class PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
 
-        User user = userRepository.findByUsername(username)
+        userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
 
         if (priority < 0) {
@@ -188,8 +278,71 @@ public class PostService {
 
         post.setPriorityScore(priority);
         Post updatedPost = postRepository.save(post);
-
         return PostResponse.fromPost(updatedPost);
     }
+    public void deletePost(UUID postId, String username) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
 
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        if (!post.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only delete your own posts");
+        }
+
+        postRepository.delete(post);
+    }
+    public Map<String, Object> getAllPostsPaged(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Post> postPage = postRepository.findAllPaged(pageable);
+
+        List<PostResponse> content = postPage.getContent().stream()
+                .map(post -> {
+                    PostResponse response = PostResponse.fromPost(post);
+                    response.setLikeCount(likeRepository.countByPost(post));
+                    response.setCommentCount(commentRepository.countByPost(post));
+                    return response;
+                })
+                .toList();
+
+        return Map.of(
+                "content", content,
+                "page", postPage.getNumber(),
+                "totalPages", postPage.getTotalPages(),
+                "totalElements", postPage.getTotalElements(),
+                "hasMore", !postPage.isLast()
+        );
+    }
+
+    public PostResponse updatePost(UUID postId, Map<String, String> request, String username) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found"));
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        if (!post.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only edit your own posts");
+        }
+
+        String description = request.get("description");
+        String imageUrl = request.get("imageUrl");
+
+        if (description != null && !description.isBlank()) {
+            post.setDescription(description);
+        }
+
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            post.setImageUrl(imageUrl);
+            ClassificationResult result = classificationService.classifyFromUrl(imageUrl);
+            post.setCategory(result.getCategory());
+        }
+
+        Post saved = postRepository.save(post);
+        PostResponse response = PostResponse.fromPost(saved);
+        response.setLikeCount(likeRepository.countByPost(saved));
+        response.setCommentCount(commentRepository.countByPost(saved));
+        return response;
+    }
 }
